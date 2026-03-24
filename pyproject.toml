@@ -1,0 +1,44 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "W", "F", "I"]
+ignore = [
+    "E501",   # line too long — relaxed for Streamlit HTML strings
+    "E741",   # ambiguous variable name (l, O, I)
+    "F401",   # unused imports — some pages import for side effects
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".streamlit",
+    "*.pyc",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '(data|utils|tests)/.*\.py$'
+extend-exclude = "pages/"   # Streamlit pages have long HTML — black exempt
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning",
+]
+
+[tool.coverage.run]
+source = ["data", "utils"]
+omit = [
+    "data/build_dataset.py",   # scraper — network dependent, not unit tested
+    "*/test_*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 80

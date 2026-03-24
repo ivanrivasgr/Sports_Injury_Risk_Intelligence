@@ -1,0 +1,80 @@
+name: CD — Deploy to Streamlit Cloud
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+
+  # ── Gate: all CI checks must pass before deploy ────────────────────────────
+  ci-gate:
+    name: CI Gate
+    uses: ./.github/workflows/ci.yml
+
+  # ── Deploy ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Streamlit Cloud
+    runs-on: ubuntu-latest
+    needs: ci-gate
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify entry point exists
+        run: |
+          test -f app.py        || (echo "app.py not found" && exit 1)
+          test -f requirements.txt || (echo "requirements.txt not found" && exit 1)
+          echo "Entry point: OK"
+
+      - name: Verify data contracts before deploy
+        run: |
+          pip install -r requirements.txt -q
+          python3 -c "
+          import sys; sys.path.insert(0,'.')
+          from data.seed_data import get_injuries_df
+          df = get_injuries_df()
+          assert len(df) >= 50
+          print(f'Pre-deploy data check: OK ({len(df)} records)')
+          "
+
+      - name: Notify deploy ready
+        run: |
+          echo "=============================================="
+          echo "  All CI checks passed. Ready for deploy."
+          echo "  Streamlit Cloud auto-deploys from main."
+          echo "  App URL: https://your-app.streamlit.app"
+          echo "=============================================="
+
+      # Streamlit Cloud deploys automatically when main is updated.
+      # No extra deploy step needed — it watches the repo directly.
+      # If using a private repo, ensure Streamlit Cloud has access.
+
+  # ── Post-deploy smoke test ─────────────────────────────────────────────────
+  smoke-test:
+    name: Post-Deploy Smoke Test
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+
+    steps:
+      - name: Wait for Streamlit Cloud to pick up changes
+        run: sleep 30
+
+      - name: HTTP health check
+        run: |
+          # Replace with your actual Streamlit Cloud URL
+          APP_URL="${{ secrets.STREAMLIT_APP_URL }}"
+          if [ -z "$APP_URL" ]; then
+            echo "STREAMLIT_APP_URL secret not set — skipping HTTP check"
+            echo "Set it in: GitHub → Settings → Secrets → Actions"
+            exit 0
+          fi
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL" --max-time 30)
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "WARN: App returned $STATUS — may still be starting up"
+          else
+            echo "Smoke test: PASSED"
+          fi

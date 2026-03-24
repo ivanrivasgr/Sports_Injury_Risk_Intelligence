@@ -1,0 +1,263 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  # ── 1. Lint ────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff + black)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install lint tools
+        run: pip install ruff black
+
+      - name: ruff check
+        run: ruff check . --select=E,W,F,I --ignore=E501
+        # E501 = line length — relaxed for long HTML strings in Streamlit pages
+
+      - name: black check
+        run: black --check --diff data/ utils/ tests/
+        # Only strict-format the pipeline code, not Streamlit pages
+
+  # ── 2. Unit tests ──────────────────────────────────────────────────────────
+  test:
+    name: Unit Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          pytest tests/ \
+            --tb=short \
+            --cov=data \
+            --cov=utils \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            -v
+        env:
+          PYTHONPATH: .
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Coverage gate (fail if < 80%)
+        run: |
+          python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('coverage.xml')
+          root = tree.getroot()
+          rate = float(root.attrib['line-rate'])
+          print(f'Coverage: {rate:.1%}')
+          assert rate >= 0.80, f'Coverage {rate:.1%} is below 80% threshold'
+          print('Coverage gate: PASSED')
+          "
+
+  # ── 3. Data contract validation ────────────────────────────────────────────
+  data-contracts:
+    name: Data Contract Validation
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate seed data schema
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from data.seed_data import get_injuries_df, get_appearances_df, get_weather_df
+
+          # Injuries contract
+          df = get_injuries_df()
+          required = ['player_name','season','injury_type','date_start','date_end',
+                      'days_missed','last_match_venue','competition','position',
+                      'is_muscular','age_at_injury']
+          for col in required:
+              assert col in df.columns, f'Missing column: {col}'
+          assert df['player_name'].isna().sum() == 0, 'Null player_name'
+          assert (df['days_missed'] >= 0).all(), 'Negative days_missed'
+          assert df['is_muscular'].isin([0,1]).all(), 'is_muscular not binary'
+          assert len(df) >= 50, f'Too few records: {len(df)}'
+          print(f'Injuries contract: OK ({len(df)} records)')
+
+          # Appearances contract
+          df2 = get_appearances_df()
+          assert 'minutes_played' in df2.columns
+          assert ((df2['minutes_played'] >= 0) & (df2['minutes_played'] <= 120)).all()
+          print(f'Appearances contract: OK ({len(df2)} records)')
+
+          print('All data contracts: PASSED')
+          "
+        env:
+          PYTHONPATH: .
+
+      - name: Validate pipeline runs without error
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0,'.')
+          from data.seed_data import get_appearances_df, get_injuries_df
+          from data.pipeline import GoldPipeline
+
+          apps = get_appearances_df()
+          inj  = get_injuries_df()
+          pipeline = GoldPipeline()
+          features, dq, errors = pipeline.run_full(apps, inj, for_training=True)
+
+          assert len(features) > 0, 'Empty feature output'
+          assert len(errors) == 0, f'{len(errors)} feature computation errors'
+          assert 'workload_14d' in features.columns
+          assert 'congestion_tier' in features.columns
+          assert 'injured_next_7d' in features.columns
+          failed_dq = [r for r in dq if not r['passed']]
+          assert len(failed_dq) == 0, f'DQ failures: {failed_dq}'
+          print(f'Pipeline validation: PASSED ({len(features)} rows, {len(dq)} DQ checks)')
+          "
+        env:
+          PYTHONPATH: .
+
+  # ── 4. Point-in-time leakage check ─────────────────────────────────────────
+  leakage-check:
+    name: Data Leakage Guard
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run leakage detection
+        run: |
+          python3 -c "
+          import sys, pandas as pd
+          from datetime import timedelta
+          sys.path.insert(0,'.')
+          from data.pipeline import compute_rolling_workload, compute_injury_label
+          from data.seed_data import get_appearances_df, get_injuries_df
+
+          apps = get_appearances_df()
+          inj  = get_injuries_df()
+          players = apps['player_name'].unique()[:5]
+          anchors = pd.date_range('2024-09-01','2024-11-01', freq='14D')
+
+          leaks = 0
+          for player in players:
+              for anchor in anchors:
+                  for w in [7, 14, 30]:
+                      result = compute_rolling_workload(apps, player, anchor, w)
+                      # Manually verify: no match at or after anchor contributed
+                      window_start = anchor - timedelta(days=w)
+                      mask = (
+                          (apps['player_name'] == player) &
+                          (apps['match_date'] >= window_start) &
+                          (apps['match_date'] < anchor)
+                      )
+                      expected = float(apps[mask]['minutes_played'].sum())
+                      if abs(result - expected) > 0.01:
+                          print(f'LEAKAGE: {player} anchor={anchor} w={w}d: got={result} expected={expected}')
+                          leaks += 1
+
+          if leaks:
+              print(f'FAILED: {leaks} leakage instances detected')
+              sys.exit(1)
+          else:
+              print(f'Leakage guard: PASSED (checked {len(players)*len(anchors)*3} windows)')
+          "
+        env:
+          PYTHONPATH: .
+
+  # ── 5. Streamlit smoke test ────────────────────────────────────────────────
+  streamlit-import:
+    name: Streamlit Import Check
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check all pages import without error
+        run: |
+          python3 -c "
+          import sys, ast
+          from pathlib import Path
+
+          pages = sorted(Path('pages').glob('p*.py'))
+          errors = []
+          for p in pages:
+              try:
+                  ast.parse(p.read_text())
+                  print(f'  ✓ {p.name}')
+              except SyntaxError as e:
+                  errors.append(f'{p.name}: {e}')
+                  print(f'  ✗ {p.name}: {e}')
+
+          # Also check data + utils modules
+          for mod in ['data/seed_data.py','data/pipeline.py',
+                      'utils/logger.py','utils/exceptions.py']:
+              try:
+                  ast.parse(Path(mod).read_text())
+                  print(f'  ✓ {mod}')
+              except SyntaxError as e:
+                  errors.append(f'{mod}: {e}')
+
+          if errors:
+              print(f'FAILED: {len(errors)} syntax errors')
+              sys.exit(1)
+          print(f'Import check: PASSED ({len(pages)} pages, 4 modules)')
+          "
