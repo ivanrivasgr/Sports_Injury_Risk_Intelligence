@@ -25,7 +25,7 @@ ignore = [
 line-length = 100
 target-version = ["py311"]
 include = '(data|utils|tests)/.*\.py$'
-extend-exclude = "views/"   # Streamlit pages have long HTML — black exempt
+extend-exclude = "views/|data/seed_data\\.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
