@@ -1,3 +1,10 @@
+![CI](https://github.com/ivanrivasgr/Sports_Injury_Risk_Intelligence/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)
+![Black](https://img.shields.io/badge/code%20style-black-000000)
+![Ruff](https://img.shields.io/badge/linter-ruff-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 # Sports Injury Risk — Data Architecture & ML Pipeline
 
 > **"This is not an analysis of outcomes. This is the system required to make reliable analysis possible."**
