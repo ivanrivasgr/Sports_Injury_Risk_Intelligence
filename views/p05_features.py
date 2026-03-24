@@ -1,6 +1,6 @@
-import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
+import streamlit as st
 
 
 def render():
@@ -118,7 +118,7 @@ player_workload_features = FeatureView(
         layer_color = {"Gold": "#92400E", "Feature Store": "#6B21A8"}.get(s["layer"], "#1D4ED8")
         layer_bg   = {"Gold": "#FEF3C7", "Feature Store": "#F3E8FF"}.get(s["layer"], "#EFF6FF")
         layer_bord = {"Gold": "#FCD34D", "Feature Store": "#C4B5FD"}.get(s["layer"], "#BFDBFE")
-        st.markdown(f"<div style='height:1px;background:#E2E8F0;margin:4px 0 2px 0;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:1px;background:#E2E8F0;margin:4px 0 2px 0;'></div>", unsafe_allow_html=True)
         with st.expander(f"  Step {s['step']} — {s['name']}"):
             col1, col2 = st.columns([2, 3])
             with col1:

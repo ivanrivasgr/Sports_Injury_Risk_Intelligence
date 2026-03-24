@@ -1,7 +1,7 @@
-import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 from plotly.subplots import make_subplots
 
 
@@ -281,7 +281,7 @@ def render():
         np.random.seed(42); n=500
         true_labels = np.random.choice([0,1],n,p=[0.88,0.12])
         scores = np.where(true_labels==1,np.random.beta(4,2,n),np.random.beta(1.5,5,n))
-        from sklearn.metrics import roc_curve, precision_recall_curve, auc
+        from sklearn.metrics import auc, precision_recall_curve, roc_curve
         fpr,tpr,_ = roc_curve(true_labels,scores); roc_auc=auc(fpr,tpr)
         prec,rec,_ = precision_recall_curve(true_labels,scores); pr_auc=auc(rec,prec)
 
@@ -292,7 +292,7 @@ def render():
         c2.markdown(f"""<div class='metric-card'><h4>PR-AUC</h4><div class='value'>{pr_auc:.3f}</div>
             <div class='sub'>baseline ~0.12 (class freq)</div>
             <div style='font-family:IBM Plex Mono,monospace;font-size:0.62rem;color:#5a4020;margin-top:6px;'>⚠ label incompleteness biases down</div></div>""", unsafe_allow_html=True)
-        c3.markdown(f"""<div class='metric-card'><h4>Label Coverage</h4><div class='value'>~65%</div>
+        c3.markdown("""<div class='metric-card'><h4>Label Coverage</h4><div class='value'>~65%</div>
             <div class='sub'>est. injuries reported</div>
             <div style='font-family:IBM Plex Mono,monospace;font-size:0.62rem;color:#5a4020;margin-top:6px;'>⚠ true positive rate underestimated</div></div>""", unsafe_allow_html=True)
 

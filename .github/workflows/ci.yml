@@ -26,8 +26,8 @@ jobs:
         run: pip install ruff black
 
       - name: ruff check
-        run: ruff check . --select=E,W,F,I --ignore=E501
-        # E501 = line length — relaxed for long HTML strings in Streamlit pages
+        run: ruff check .
+        # Config is read from pyproject.toml [tool.ruff.lint]
 
       - name: black check
         run: black --check --diff data/ utils/ tests/
@@ -155,7 +155,7 @@ jobs:
         env:
           PYTHONPATH: .
 
-  # ── 4. Point-in-time leakage check ─────────────────────────────────────────
+  # ── 4. Point-in-time leakage check ────────────────────────────────────────
   leakage-check:
     name: Data Leakage Guard
     runs-on: ubuntu-latest
@@ -192,7 +192,6 @@ jobs:
               for anchor in anchors:
                   for w in [7, 14, 30]:
                       result = compute_rolling_workload(apps, player, anchor, w)
-                      # Manually verify: no match at or after anchor contributed
                       window_start = anchor - timedelta(days=w)
                       mask = (
                           (apps['player_name'] == player) &
@@ -237,22 +236,21 @@ jobs:
           import sys, ast
           from pathlib import Path
 
-          pages = sorted(Path('pages').glob('p*.py'))
+          pages = sorted(Path('views').glob('p*.py'))
           errors = []
           for p in pages:
               try:
                   ast.parse(p.read_text())
-                  print(f'  ✓ {p.name}')
+                  print(f'  ✔ {p.name}')
               except SyntaxError as e:
                   errors.append(f'{p.name}: {e}')
                   print(f'  ✗ {p.name}: {e}')
 
-          # Also check data + utils modules
           for mod in ['data/seed_data.py','data/pipeline.py',
                       'utils/logger.py','utils/exceptions.py']:
               try:
                   ast.parse(Path(mod).read_text())
-                  print(f'  ✓ {mod}')
+                  print(f'  ✔ {mod}')
               except SyntaxError as e:
                   errors.append(f'{mod}: {e}')
 
@@ -261,3 +259,5 @@ jobs:
               sys.exit(1)
           print(f'Import check: PASSED ({len(pages)} pages, 4 modules)')
           "
+        env:
+          PYTHONPATH: .

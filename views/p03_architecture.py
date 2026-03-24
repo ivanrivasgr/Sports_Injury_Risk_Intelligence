@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-
 # ── Real Madrid palette ───────────────────────────────────────────────────────
 # White #FFFFFF  Purple #4B0082 / #6B21A8  Gold #C9A84C  Light grey #F8F9FA
 

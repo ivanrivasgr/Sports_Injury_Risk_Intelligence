@@ -33,7 +33,6 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from utils.logger import get_logger
 from utils.exceptions import (
     DataLeakageError,
     DQCheckError,
@@ -42,6 +41,7 @@ from utils.exceptions import (
     SchemaValidationError,
     is_blocking,
 )
+from utils.logger import get_logger
 
 # ── Module-level logger ───────────────────────────────────────────────────────
 
@@ -49,6 +49,7 @@ log = get_logger("gold", "pipeline")
 
 
 # ── Individual feature functions ──────────────────────────────────────────────
+
 
 def compute_rolling_workload(
     appearances: pd.DataFrame,
@@ -70,7 +71,7 @@ def compute_rolling_workload(
         mask = (
             (appearances["player_name"] == player_id)
             & (appearances["match_date"] >= window_start)
-            & (appearances["match_date"] < anchor_ts)   # strict
+            & (appearances["match_date"] < anchor_ts)  # strict
         )
         window_df = appearances[mask]
 
@@ -114,11 +115,7 @@ def compute_congestion_index(
             & (appearances["match_date"] >= window_start)
             & (appearances["match_date"] < anchor_ts)
         )
-        dates = (
-            appearances.loc[mask, "match_date"]
-            .sort_values()
-            .reset_index(drop=True)
-        )
+        dates = appearances.loc[mask, "match_date"].sort_values().reset_index(drop=True)
         if len(dates) < 2:
             return None
         gaps = [(dates[i] - dates[i - 1]).days for i in range(1, len(dates))]
@@ -139,7 +136,7 @@ def assign_congestion_tier(index: Optional[float]) -> int:
     Tier 4 = most congested (<= 3 rest days avg).
     """
     if index is None:
-        return 1   # insufficient data → assume low congestion
+        return 1  # insufficient data → assume low congestion
     if index <= 3:
         return 4
     if index <= 4:
@@ -170,13 +167,12 @@ def compute_injury_label(
         horizon_end = anchor_ts + timedelta(days=horizon_days)
         mask = (
             (injuries["player_name"] == player_id)
-            & (injuries["date_start"] > anchor_ts)    # strict — not at anchor
+            & (injuries["date_start"] > anchor_ts)  # strict — not at anchor
             & (injuries["date_start"] <= horizon_end)
         )
         # Leakage guard: ensure no injury at exactly anchor_ts slipped through
         at_anchor = injuries[
-            (injuries["player_name"] == player_id)
-            & (injuries["date_start"] == anchor_ts)
+            (injuries["player_name"] == player_id) & (injuries["date_start"] == anchor_ts)
         ]
         if not at_anchor.empty:
             raise DataLeakageError(
@@ -200,13 +196,15 @@ def compute_injury_label(
 
 # ── Schema validators ─────────────────────────────────────────────────────────
 
+
 def validate_appearances_schema(df: pd.DataFrame) -> None:
     """Silver-layer schema contract for appearances."""
     required = {"player_name", "match_date", "minutes_played", "venue", "competition"}
     missing = required - set(df.columns)
     if missing:
         raise SchemaValidationError(
-            field=str(missing), value="<missing>",
+            field=str(missing),
+            value="<missing>",
             rule=f"required columns: {required}",
         )
     bad_minutes = df[(df["minutes_played"] < 0) | (df["minutes_played"] > 120)]
@@ -225,18 +223,21 @@ def validate_injuries_schema(df: pd.DataFrame) -> None:
     missing = required - set(df.columns)
     if missing:
         raise SchemaValidationError(
-            field=str(missing), value="<missing>",
+            field=str(missing),
+            value="<missing>",
             rule=f"required columns: {required}",
         )
     if df["player_name"].isna().any():
         raise SchemaValidationError(
-            field="player_name", value="NULL",
+            field="player_name",
+            value="NULL",
             rule="player_name NOT NULL",
         )
     log.debug("Injuries schema: OK", context={"rows": len(df)})
 
 
 # ── DQ checks ────────────────────────────────────────────────────────────────
+
 
 def run_dq_checks(df: pd.DataFrame, table: str) -> list[dict]:
     """
@@ -247,20 +248,27 @@ def run_dq_checks(df: pd.DataFrame, table: str) -> list[dict]:
 
     def check(name: str, pass_rate: float, threshold: float, severity: str):
         passed = pass_rate >= threshold
-        results.append({
-            "check": name, "table": table,
-            "pass_rate": round(pass_rate, 4),
-            "threshold": threshold,
-            "severity": severity,
-            "passed": passed,
-        })
+        results.append(
+            {
+                "check": name,
+                "table": table,
+                "pass_rate": round(pass_rate, 4),
+                "threshold": threshold,
+                "severity": severity,
+                "passed": passed,
+            }
+        )
         if not passed:
             exc = DQCheckError(name, table, pass_rate, threshold, severity)
             if is_blocking(exc):
-                log.critical(f"DQ BLOCK: {name}", context={"pass_rate": pass_rate, "threshold": threshold})
+                log.critical(
+                    f"DQ BLOCK: {name}", context={"pass_rate": pass_rate, "threshold": threshold}
+                )
                 raise exc
             else:
-                log.warning(f"DQ WARN: {name}", context={"pass_rate": pass_rate, "threshold": threshold})
+                log.warning(
+                    f"DQ WARN: {name}", context={"pass_rate": pass_rate, "threshold": threshold}
+                )
         return passed
 
     if "player_name" in df.columns:
@@ -279,6 +287,7 @@ def run_dq_checks(df: pd.DataFrame, table: str) -> list[dict]:
 
 
 # ── Gold pipeline ─────────────────────────────────────────────────────────────
+
 
 class GoldPipeline:
     """
@@ -310,11 +319,14 @@ class GoldPipeline:
         for_training    If True, compute injury label (look-ahead)
         label_horizon_days  Days after anchor to check for injury
         """
-        self.log.info("Gold pipeline started", context={
-            "appearances": len(appearances),
-            "injuries": len(injuries),
-            "for_training": for_training,
-        })
+        self.log.info(
+            "Gold pipeline started",
+            context={
+                "appearances": len(appearances),
+                "injuries": len(injuries),
+                "for_training": for_training,
+            },
+        )
 
         # ── Schema validation ─────────────────────────────────────────────────
         try:
@@ -335,7 +347,7 @@ class GoldPipeline:
 
         # ── Feature computation ───────────────────────────────────────────────
         records = []
-        errors  = []
+        errors = []
         players = appearances["player_name"].unique()
 
         for player in players:
@@ -344,11 +356,11 @@ class GoldPipeline:
             for _, row in player_apps.iterrows():
                 anchor = pd.Timestamp(row["match_date"])
                 rec = {
-                    "player_name":        player,
-                    "anchor_ts":          anchor,
-                    "venue":              row.get("venue"),
-                    "competition":        row.get("competition"),
-                    "minutes_played":     row["minutes_played"],
+                    "player_name": player,
+                    "anchor_ts": anchor,
+                    "venue": row.get("venue"),
+                    "competition": row.get("competition"),
+                    "minutes_played": row["minutes_played"],
                 }
 
                 # Rolling workload
@@ -359,19 +371,22 @@ class GoldPipeline:
                         )
                     except (DataLeakageError, FeatureComputationError) as e:
                         errors.append(e.to_dict())
-                        self.log.exception(f"workload_{w}d failed", e,
-                                           context={"player": player, "anchor": str(anchor)})
+                        self.log.exception(
+                            f"workload_{w}d failed",
+                            e,
+                            context={"player": player, "anchor": str(anchor)},
+                        )
                         rec[f"workload_{w}d"] = None
 
                 # Congestion
                 try:
                     ci = compute_congestion_index(appearances, player, anchor)
                     rec["congestion_index"] = ci
-                    rec["congestion_tier"]  = assign_congestion_tier(ci)
+                    rec["congestion_tier"] = assign_congestion_tier(ci)
                 except FeatureComputationError as e:
                     errors.append(e.to_dict())
                     rec["congestion_index"] = None
-                    rec["congestion_tier"]  = 1
+                    rec["congestion_tier"] = 1
 
                 # Label (training only)
                 if for_training:
@@ -391,11 +406,14 @@ class GoldPipeline:
 
         features_df = pd.DataFrame(records)
 
-        self.log.info("Gold pipeline complete", context={
-            "output_rows": len(features_df),
-            "feature_errors": len(errors),
-            "error_rate": round(len(errors) / max(len(records), 1), 4),
-        })
+        self.log.info(
+            "Gold pipeline complete",
+            context={
+                "output_rows": len(features_df),
+                "feature_errors": len(errors),
+                "error_rate": round(len(errors) / max(len(records), 1), 4),
+            },
+        )
 
         if errors:
             self.log.warning(
@@ -412,7 +430,7 @@ if __name__ == "__main__":
     from data.seed_data import get_appearances_df, get_injuries_df
 
     appearances = get_appearances_df()
-    injuries    = get_injuries_df()
+    injuries = get_injuries_df()
 
     pipeline = GoldPipeline()
     features, dq, errors = pipeline.run_full(appearances, injuries, for_training=True)

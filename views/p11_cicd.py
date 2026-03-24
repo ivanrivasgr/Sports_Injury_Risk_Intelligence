@@ -1,19 +1,19 @@
 """
-pages/p11_cicd.py
+views/p11_cicd.py
 =================
 CI/CD status, test results, pipeline debug console, and log viewer.
 Shows what a production observability + debugging interface looks like.
 """
 
-import sys
 import json
 import subprocess
+import sys
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -21,13 +21,17 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from utils.logger import get_logger, read_log_records, clear_logs, JSONL_PATH
-from utils.exceptions import (
-    DataContractError, SchemaValidationError, DQCheckError,
-    DataLeakageError, FeatureComputationError, is_blocking,
-)
-from data.seed_data import get_injuries_df, get_appearances_df
 from data.pipeline import GoldPipeline, run_dq_checks
+from data.seed_data import get_appearances_df, get_injuries_df
+from utils.exceptions import (
+    DataContractError,
+    DataLeakageError,
+    DQCheckError,
+    FeatureComputationError,
+    SchemaValidationError,
+    is_blocking,
+)
+from utils.logger import JSONL_PATH, clear_logs, get_logger, read_log_records
 
 DARK = "#F8FAFC"; BG = "#F1F5F9"; CARD = "#FFFFFF"; BORD = "#E2E8F0"
 TEXT = "#475569"; HIGH = "#0F172A"; BLUE = "#1D4ED8"; GRN = "#16A34A"
@@ -84,8 +88,11 @@ def run_inline_tests() -> list[dict]:
     appearances = get_appearances_df()
 
     from data.pipeline import (
-        compute_rolling_workload, compute_congestion_index,
-        compute_injury_label, validate_appearances_schema, validate_injuries_schema,
+        compute_congestion_index,
+        compute_injury_label,
+        compute_rolling_workload,
+        validate_appearances_schema,
+        validate_injuries_schema,
     )
 
     # ── Seed data ─────────────────────────────────────────────────────────────
@@ -236,7 +243,7 @@ def run_inline_tests() -> list[dict]:
         }])
         try:
             label = compute_injury_label(at_anchor, "Player A", base, 7)
-            assert label == 0, f"Concurrent injury labelled 1 — DATA LEAKAGE"
+            assert label == 0, "Concurrent injury labelled 1 — DATA LEAKAGE"
         except (DataLeakageError, FeatureComputationError):
             pass  # correct — leakage detected and raised
     test("pipeline: concurrent injury at anchor → NOT labelled 1 (leakage guard)", test_no_concurrent_label)

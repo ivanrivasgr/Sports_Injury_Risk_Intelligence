@@ -1,6 +1,7 @@
-import streamlit as st
-import sys
 import os
+import sys
+
+import streamlit as st
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
@@ -171,6 +172,21 @@ code {
 /* Multiselect tags — purple */
 .stMultiSelect span[data-baseweb="tag"] {
     background: #F3F0FF !important; color: #4B0082 !important;
+}
+
+/* Buttons — white text always visible on purple background */
+.stButton > button {
+    background-color: #6B21A8 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-weight: 600 !important;
+}
+.stButton > button:hover {
+    background-color: #4B0082 !important;
+    color: #FFFFFF !important;
+}
+.stButton > button p {
+    color: #FFFFFF !important;
 }
 </style>
 """, unsafe_allow_html=True)

@@ -19,18 +19,20 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from data.seed_data import get_injuries_df, get_appearances_df, get_weather_df
-
+from data.seed_data import get_appearances_df, get_injuries_df, get_weather_df
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def injuries():
     return get_injuries_df()
 
+
 @pytest.fixture(scope="module")
 def appearances():
     return get_appearances_df()
+
 
 @pytest.fixture(scope="module")
 def weather():
@@ -39,14 +41,22 @@ def weather():
 
 # ── injuries table ────────────────────────────────────────────────────────────
 
+
 class TestInjuriesSchema:
 
     def test_required_columns_present(self, injuries):
         required = [
-            "player_name", "season", "injury_type",
-            "date_start", "date_end", "days_missed",
-            "last_match_venue", "competition",
-            "position", "is_muscular", "age_at_injury",
+            "player_name",
+            "season",
+            "injury_type",
+            "date_start",
+            "date_end",
+            "days_missed",
+            "last_match_venue",
+            "competition",
+            "position",
+            "is_muscular",
+            "age_at_injury",
         ]
         for col in required:
             assert col in injuries.columns, f"Missing column: {col}"
@@ -60,10 +70,12 @@ class TestInjuriesSchema:
         assert nulls == 0, f"Found {nulls} null date_start values"
 
     def test_date_types(self, injuries):
-        assert pd.api.types.is_datetime64_any_dtype(injuries["date_start"]), \
-            "date_start must be datetime"
-        assert pd.api.types.is_datetime64_any_dtype(injuries["date_end"]), \
-            "date_end must be datetime"
+        assert pd.api.types.is_datetime64_any_dtype(
+            injuries["date_start"]
+        ), "date_start must be datetime"
+        assert pd.api.types.is_datetime64_any_dtype(
+            injuries["date_end"]
+        ), "date_end must be datetime"
 
     def test_season_format(self, injuries):
         """Season must follow YYYY-YY format."""
@@ -71,8 +83,7 @@ class TestInjuriesSchema:
         assert len(bad) == 0, f"Invalid season format: {bad['season'].unique()}"
 
     def test_is_muscular_binary(self, injuries):
-        assert injuries["is_muscular"].isin([0, 1]).all(), \
-            "is_muscular must be 0 or 1"
+        assert injuries["is_muscular"].isin([0, 1]).all(), "is_muscular must be 0 or 1"
 
     def test_days_missed_non_negative(self, injuries):
         neg = (injuries["days_missed"] < 0).sum()
@@ -96,25 +107,24 @@ class TestInjuriesSchema:
 
     def test_age_at_injury_reasonable(self, injuries):
         """Professional footballers are between 15 and 45."""
-        bad = injuries[
-            (injuries["age_at_injury"] < 15) |
-            (injuries["age_at_injury"] > 45)
-        ]
-        assert len(bad) == 0, \
-            f"Found {len(bad)} records with unreasonable age: {bad[['player_name','age_at_injury']]}"
+        bad = injuries[(injuries["age_at_injury"] < 15) | (injuries["age_at_injury"] > 45)]
+        assert (
+            len(bad) == 0
+        ), f"Found {len(bad)} records with unreasonable age: {bad[['player_name','age_at_injury']]}"
 
     def test_minimum_record_count(self, injuries):
         """Dataset must have at least 50 records (sanity check)."""
-        assert len(injuries) >= 50, \
-            f"Too few injury records: {len(injuries)} (expected >= 50)"
+        assert len(injuries) >= 50, f"Too few injury records: {len(injuries)} (expected >= 50)"
 
     def test_minimum_seasons(self, injuries):
-        assert injuries["season"].nunique() >= 4, \
-            f"Expected >= 4 seasons, got {injuries['season'].nunique()}"
+        assert (
+            injuries["season"].nunique() >= 4
+        ), f"Expected >= 4 seasons, got {injuries['season'].nunique()}"
 
     def test_minimum_players(self, injuries):
-        assert injuries["player_name"].nunique() >= 10, \
-            f"Expected >= 10 players, got {injuries['player_name'].nunique()}"
+        assert (
+            injuries["player_name"].nunique() >= 10
+        ), f"Expected >= 10 players, got {injuries['player_name'].nunique()}"
 
     def test_position_values(self, injuries):
         valid_positions = {"GK", "CB", "RB", "LB", "CM", "AM", "RW", "LW", "ST", "UNK"}
@@ -124,11 +134,13 @@ class TestInjuriesSchema:
     def test_muscular_injury_rate_plausible(self, injuries):
         """Muscular injuries should be 50–90% of all injuries (documented literature range)."""
         rate = injuries["is_muscular"].mean()
-        assert 0.50 <= rate <= 0.90, \
-            f"Muscular injury rate {rate:.1%} outside expected range [50%, 90%]"
+        assert (
+            0.50 <= rate <= 0.90
+        ), f"Muscular injury rate {rate:.1%} outside expected range [50%, 90%]"
 
 
 # ── appearances table ─────────────────────────────────────────────────────────
+
 
 class TestAppearancesSchema:
 
@@ -139,11 +151,9 @@ class TestAppearancesSchema:
 
     def test_minutes_played_range(self, appearances):
         bad = appearances[
-            (appearances["minutes_played"] < 0) |
-            (appearances["minutes_played"] > 120)
+            (appearances["minutes_played"] < 0) | (appearances["minutes_played"] > 120)
         ]
-        assert len(bad) == 0, \
-            f"Found {len(bad)} records with minutes_played outside [0, 120]"
+        assert len(bad) == 0, f"Found {len(bad)} records with minutes_played outside [0, 120]"
 
     def test_venue_values(self, appearances):
         valid = {"Bernabéu", "Away"}
@@ -155,6 +165,7 @@ class TestAppearancesSchema:
 
 
 # ── weather table ─────────────────────────────────────────────────────────────
+
 
 class TestWeatherSchema:
 
@@ -171,8 +182,7 @@ class TestWeatherSchema:
 
     def test_temp_max_gte_min(self, weather):
         bad = weather[weather["temp_max_c"] < weather["temp_min_c"]]
-        assert len(bad) == 0, \
-            f"Found {len(bad)} records where temp_max < temp_min"
+        assert len(bad) == 0, f"Found {len(bad)} records where temp_max < temp_min"
 
     def test_precipitation_non_negative(self, weather):
         neg = (weather["precipitation_mm"] < 0).sum()

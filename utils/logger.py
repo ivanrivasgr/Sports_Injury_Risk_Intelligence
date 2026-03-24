@@ -35,38 +35,38 @@ from pathlib import Path
 from typing import Any
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-ROOT     = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 LOGS_DIR = ROOT / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 JSONL_PATH = LOGS_DIR / "pipeline.jsonl"
 
 # ── ANSI colour codes ─────────────────────────────────────────────────────────
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
-GREY   = "\033[90m"
-CYAN   = "\033[96m"
-GREEN  = "\033[92m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+GREY = "\033[90m"
+CYAN = "\033[96m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-RED    = "\033[91m"
-BRED   = "\033[1;91m"
+RED = "\033[91m"
+BRED = "\033[1;91m"
 
 LEVEL_COLORS = {
-    "DEBUG":    GREY,
-    "INFO":     GREEN,
-    "WARNING":  YELLOW,
-    "ERROR":    RED,
+    "DEBUG": GREY,
+    "INFO": GREEN,
+    "WARNING": YELLOW,
+    "ERROR": RED,
     "CRITICAL": BRED,
 }
 
 LAYER_COLORS = {
-    "ingestion":     "\033[35m",   # magenta
-    "bronze":        "\033[33m",   # orange-ish
-    "silver":        "\033[34m",   # blue
-    "enriched":      "\033[32m",   # green
-    "gold":          "\033[33m",   # yellow
-    "feature_store": "\033[35m",   # purple-ish
-    "ml":            "\033[36m",   # cyan
-    "app":           "\033[37m",   # white
+    "ingestion": "\033[35m",  # magenta
+    "bronze": "\033[33m",  # orange-ish
+    "silver": "\033[34m",  # blue
+    "enriched": "\033[32m",  # green
+    "gold": "\033[33m",  # yellow
+    "feature_store": "\033[35m",  # purple-ish
+    "ml": "\033[36m",  # cyan
+    "app": "\033[37m",  # white
 }
 
 
@@ -77,9 +77,9 @@ class PipelineLogger:
     """
 
     def __init__(self, layer: str, source: str):
-        self.layer  = layer
+        self.layer = layer
         self.source = source
-        self._std   = logging.getLogger(f"{layer}.{source}")
+        self._std = logging.getLogger(f"{layer}.{source}")
         if not self._std.handlers:
             h = logging.StreamHandler(sys.stdout)
             h.setFormatter(logging.Formatter("%(message)s"))
@@ -88,15 +88,15 @@ class PipelineLogger:
             self._std.propagate = False
 
     def _write(self, level: str, message: str, context: dict[str, Any] | None = None):
-        ts  = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(timezone.utc).isoformat()
         ctx = context or {}
 
         # ── JSONL record ──────────────────────────────────────────────────────
         record = {
-            "ts":      ts,
-            "level":   level,
-            "layer":   self.layer,
-            "source":  self.source,
+            "ts": ts,
+            "level": level,
+            "layer": self.layer,
+            "source": self.source,
             "message": message,
             "context": ctx,
         }
@@ -140,8 +140,8 @@ class PipelineLogger:
         """Log an exception with full traceback in JSONL, clean summary in console."""
         ctx = dict(context or {})
         ctx["exception_type"] = type(exc).__name__
-        ctx["exception_msg"]  = str(exc)
-        ctx["traceback"]      = traceback.format_exc()
+        ctx["exception_msg"] = str(exc)
+        ctx["traceback"] = traceback.format_exc()
         self._write("ERROR", f"{msg}: {type(exc).__name__}: {exc}", ctx)
 
 

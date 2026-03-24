@@ -23,11 +23,12 @@ The output is always written to data/gold_injuries.csv and data/gold_appearances
 """
 
 import argparse
+import json
 import os
 import time
-import json
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 DATA_DIR = Path(__file__).parent
 
@@ -46,7 +47,7 @@ def scrape_transfermarkt_injuries(player_id: int, player_name: str) -> list[dict
     url = f"https://www.transfermarkt.us/{player_name.lower().replace(' ', '-')}/verletzungen/spieler/{player_id}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
     }
 
@@ -64,16 +65,18 @@ def scrape_transfermarkt_injuries(player_id: int, player_name: str) -> list[dict
         if len(cols) < 7:
             continue
         try:
-            rows.append({
-                "player_id":        str(player_id),
-                "player_name":      player_name,
-                "season":           cols[0].get_text(strip=True),
-                "injury_type":      cols[1].get_text(strip=True),
-                "date_start":       cols[2].get_text(strip=True),
-                "date_end":         cols[3].get_text(strip=True),
-                "days_missed":      cols[4].get_text(strip=True).replace("-", "0"),
-                "matches_missed":   cols[5].get_text(strip=True).replace("-", "0"),
-            })
+            rows.append(
+                {
+                    "player_id": str(player_id),
+                    "player_name": player_name,
+                    "season": cols[0].get_text(strip=True),
+                    "injury_type": cols[1].get_text(strip=True),
+                    "date_start": cols[2].get_text(strip=True),
+                    "date_end": cols[3].get_text(strip=True),
+                    "days_missed": cols[4].get_text(strip=True).replace("-", "0"),
+                    "matches_missed": cols[5].get_text(strip=True).replace("-", "0"),
+                }
+            )
         except Exception:
             continue
 
@@ -103,17 +106,18 @@ def scrape_open_meteo_bernabeu(date_str: str) -> dict:
     data = r.json()
     daily = data.get("daily", {})
     return {
-        "date":            date_str,
-        "temp_max_c":      daily.get("temperature_2m_max", [None])[0],
-        "temp_min_c":      daily.get("temperature_2m_min", [None])[0],
+        "date": date_str,
+        "temp_max_c": daily.get("temperature_2m_max", [None])[0],
+        "temp_min_c": daily.get("temperature_2m_min", [None])[0],
         "precipitation_mm": daily.get("precipitation_sum", [0])[0],
-        "wind_kph":         daily.get("windspeed_10m_max", [None])[0],
+        "wind_kph": daily.get("windspeed_10m_max", [None])[0],
     }
 
 
 def load_seed_data():
     """Load pre-built seed dataset."""
-    from data.seed_data import get_injuries_df, get_appearances_df, get_weather_df
+    from data.seed_data import get_appearances_df, get_injuries_df, get_weather_df
+
     return get_injuries_df(), get_appearances_df(), get_weather_df()
 
 
@@ -122,21 +126,21 @@ def build_gold_dataset(scrape=False):
         print("Running live scrapers...")
         # --- injuries ---
         SQUAD = [
-            ("Thibaut Courtois",    25557),
-            ("Dani Carvajal",       138927),
-            ("Eder Militao",        314558),
-            ("Antonio Rudiger",     86516),
-            ("Ferland Mendy",       342229),
-            ("Luka Modric",         27992),
+            ("Thibaut Courtois", 25557),
+            ("Dani Carvajal", 138927),
+            ("Eder Militao", 314558),
+            ("Antonio Rudiger", 86516),
+            ("Ferland Mendy", 342229),
+            ("Luka Modric", 27992),
             ("Aurelien Tchouameni", 457064),
-            ("Eduardo Camavinga",   455194),
-            ("Federico Valverde",   371998),
-            ("Vinicius Jr",         339032),
-            ("Jude Bellingham",     581678),
-            ("Rodrygo",             412363),
-            ("Dani Ceballos",       163426),
-            ("Lucas Vazquez",       166246),
-            ("David Alaba",         67229),
+            ("Eduardo Camavinga", 455194),
+            ("Federico Valverde", 371998),
+            ("Vinicius Jr", 339032),
+            ("Jude Bellingham", 581678),
+            ("Rodrygo", 412363),
+            ("Dani Ceballos", 163426),
+            ("Lucas Vazquez", 166246),
+            ("David Alaba", 67229),
         ]
         all_injuries = []
         for name, pid in SQUAD:
@@ -171,6 +175,8 @@ def build_gold_dataset(scrape=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scrape", action="store_true", help="Run live scrapers (requires network)")
+    parser.add_argument(
+        "--scrape", action="store_true", help="Run live scrapers (requires network)"
+    )
     args = parser.parse_args()
     build_gold_dataset(scrape=args.scrape)
